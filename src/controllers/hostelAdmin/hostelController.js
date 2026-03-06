@@ -245,6 +245,17 @@ const transferStudent = async (req, res) => {
     if (newRoom.currentOccupancy >= newRoom.capacity) newRoom.status = 'occupied';
     await newRoom.save();
 
+    // Notify student about transfer
+    const floor = await newRoom.getFloor();
+    emitToUser(student.id, 'room_transferred', {
+      message: `You have been transferred to Room ${newRoom.roomNumber}, Floor ${floor.floorNumber}`,
+      roomNumber: newRoom.roomNumber,
+      floorNumber: floor.floorNumber,
+    });
+
+    // Refresh data
+    emitToHostel(hostel.id, 'data_refresh', { type: 'students' });
+
     res.json({ message: 'Student transferred', student });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -260,6 +271,9 @@ const checkoutStudent = async (req, res) => {
     });
     if (!student) return res.status(404).json({ message: 'Student not found' });
 
+    const studentId = student.id;
+    const hostelId = hostel.id;
+
     // Free room
     if (student.roomId) {
       const room = await Room.findByPk(student.roomId);
@@ -272,8 +286,18 @@ const checkoutStudent = async (req, res) => {
 
     student.isActive = false;
     student.checkOutDate = new Date();
+    student.hostelId = null;
     student.roomId = null;
     await student.save();
+
+    // Notify the student they've been checked out
+    emitToUser(studentId, 'checked_out', {
+      message: 'You have been checked out from the hostel.',
+    });
+
+    // Refresh admin's student list and dashboard
+    emitToHostel(hostelId, 'data_refresh', { type: 'students' });
+    emitToSuperAdmin('data_refresh', { type: 'dashboard' });
 
     res.json({ message: 'Student checked out' });
   } catch (error) {
