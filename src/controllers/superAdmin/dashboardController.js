@@ -1,6 +1,7 @@
 const { Hostel, HostelAdmin, Student, Subscription, AppConfig } = require('../../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../../config/database');
+const { emitToHostelAdmin, emitToSuperAdmin } = require('../../config/socket');
 
 // GET /api/super-admin/dashboard
 const getDashboard = async (req, res) => {
@@ -63,6 +64,8 @@ const updatePricing = async (req, res) => {
       { value: String(pricePerStudent) },
       { where: { key: 'price_per_student' } }
     );
+    emitToSuperAdmin('data_refresh', { type: 'config' });
+
     res.json({ message: 'Pricing updated', pricePerStudent });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -77,6 +80,8 @@ const updateTrialDays = async (req, res) => {
       { value: String(trialDays) },
       { where: { key: 'trial_days' } }
     );
+    emitToSuperAdmin('data_refresh', { type: 'config' });
+
     res.json({ message: 'Trial days updated', trialDays });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -100,6 +105,13 @@ const toggleBlockAdmin = async (req, res) => {
       { where: { adminId: admin.id } }
     );
 
+    // Notify the admin about their status change
+    emitToHostelAdmin(admin.id, 'admin_blocked', {
+      message: admin.isBlocked ? 'Your account has been blocked by admin.' : 'Your account has been unblocked.',
+      isBlocked: admin.isBlocked,
+    });
+    emitToSuperAdmin('data_refresh', { type: 'admins' });
+
     res.json({ message: `Admin ${admin.isBlocked ? 'blocked' : 'unblocked'}`, admin });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -118,6 +130,12 @@ const deleteAdmin = async (req, res) => {
     await admin.save();
 
     await Hostel.update({ isLocked: true }, { where: { adminId: admin.id } });
+
+    emitToHostelAdmin(admin.id, 'admin_blocked', {
+      message: 'Your account has been deactivated.',
+      isBlocked: true,
+    });
+    emitToSuperAdmin('data_refresh', { type: 'admins' });
 
     res.json({ message: 'Admin deactivated' });
   } catch (error) {

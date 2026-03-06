@@ -15,8 +15,8 @@ if (process.env.DATABASE_URL) {
     },
     logging: false,
     pool: {
-      max: 10,
-      min: 0,
+      max: 20,
+      min: 2,
       acquire: 30000,
       idle: 10000,
     },
@@ -33,8 +33,8 @@ if (process.env.DATABASE_URL) {
       dialect: 'mysql',
       logging: process.env.NODE_ENV === 'development' ? console.log : false,
       pool: {
-        max: 10,
-        min: 0,
+        max: 20,
+        min: 2,
         acquire: 30000,
         idle: 10000,
       },

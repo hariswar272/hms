@@ -1,5 +1,5 @@
 const { Hostel, Floor, Room, Student, StudentRequest } = require('../../models');
-const { emitToUser, emitToHostel, emitToSuperAdmin } = require('../../config/socket');
+const { emitToUser, emitToHostel, emitToHostelAdmin, emitToSuperAdmin } = require('../../config/socket');
 
 // POST /api/hostel-admin/floors
 const addFloor = async (req, res) => {
@@ -13,6 +13,9 @@ const addFloor = async (req, res) => {
     if (existing) return res.status(400).json({ message: 'Floor already exists' });
 
     const floor = await Floor.create({ floorNumber, hostelId: hostel.id });
+
+    emitToHostel(hostel.id, 'data_refresh', { type: 'rooms' });
+
     res.status(201).json(floor);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -55,6 +58,10 @@ const addRoom = async (req, res) => {
       floorId,
       hostelId: hostel.id,
     });
+
+    emitToHostel(hostel.id, 'data_refresh', { type: 'rooms' });
+    emitToSuperAdmin('data_refresh', { type: 'dashboard' });
+
     res.status(201).json(room);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -95,6 +102,9 @@ const updateRoom = async (req, res) => {
     if (status) room.status = status;
 
     await room.save();
+
+    emitToHostel(hostel.id, 'data_refresh', { type: 'rooms' });
+
     res.json(room);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -186,6 +196,14 @@ const rejectStudentRequest = async (req, res) => {
 
     request.status = 'rejected';
     await request.save();
+
+    // Notify student their request was rejected
+    emitToUser(request.studentId, 'request_rejected', {
+      message: 'Your hostel request has been rejected.',
+    });
+
+    // Refresh data
+    emitToHostel(hostel.id, 'data_refresh', { type: 'requests' });
 
     res.json({ message: 'Request rejected' });
   } catch (error) {

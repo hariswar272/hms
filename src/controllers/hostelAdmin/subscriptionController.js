@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const razorpay = require('../../config/razorpay');
 const { Hostel, Student, Subscription, AppConfig } = require('../../models');
+const { emitToHostel, emitToSuperAdmin } = require('../../config/socket');
 
 // GET /api/hostel-admin/subscription/status
 const getSubscriptionStatus = async (req, res) => {
@@ -156,6 +157,10 @@ const verifyPayment = async (req, res) => {
     hostel.isLocked = false;
     hostel.isSubscribed = true;
     await hostel.save();
+
+    // Notify super admin about subscription payment
+    emitToSuperAdmin('data_refresh', { type: 'dashboard' });
+    emitToHostel(hostel.id, 'data_refresh', { type: 'subscription' });
 
     res.json({
       message: 'Payment verified and subscription activated',

@@ -1,4 +1,5 @@
 const { Expense, Hostel } = require('../../models');
+const { emitToHostel } = require('../../config/socket');
 
 // POST /api/hostel-admin/expenses
 const addExpense = async (req, res) => {
@@ -14,6 +15,9 @@ const addExpense = async (req, res) => {
       amount,
       date,
     });
+
+    emitToHostel(hostel.id, 'data_refresh', { type: 'expenses' });
+
     res.status(201).json(expense);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -54,6 +58,9 @@ const deleteExpense = async (req, res) => {
     if (!expense) return res.status(404).json({ message: 'Expense not found' });
 
     await expense.destroy();
+
+    emitToHostel(hostel.id, 'data_refresh', { type: 'expenses' });
+
     res.json({ message: 'Expense deleted' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
